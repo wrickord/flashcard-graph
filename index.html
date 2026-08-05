@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Flashcard Knowledge Graph</title>
+<style>
+  :root {
+    --bg: #12141a; --panel: #1a1d25; --line: #2b3040; --text: #e8eaf0;
+    --muted: #98a0b3; --accent: #6ea8fe; --chip: #232734;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #ffffff; --panel: #f7f8fa; --line: #e2e5ec; --text: #1d2129;
+      --muted: #6b7280; --accent: #2563eb; --chip: #eef1f6;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+  }
+  #app { display: flex; flex-direction: column; height: 100%; }
+  header {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    padding: 8px 12px; border-bottom: 1px solid var(--line);
+  }
+  header h1 { font-size: 13px; font-weight: 600; margin: 0 6px 0 0; }
+  header .stats { color: var(--muted); font-size: 12px; margin-right: auto; }
+  input, select, button {
+    background: var(--chip); color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 12px;
+  }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  main { display: flex; flex: 1; min-height: 0; }
+  #graphwrap { flex: 1; min-width: 0; position: relative; overflow: hidden; }
+  svg { width: 100%; height: 100%; display: block; cursor: grab; }
+  svg.dragging { cursor: grabbing; }
+  .edge { stroke: var(--muted); stroke-opacity: .18; }
+  .edge.hot { stroke: var(--accent); stroke-opacity: .85; }
+  .edge.mute { stroke-opacity: .04; }
+  .node { cursor: pointer; }
+  .node circle { stroke: var(--bg); stroke-width: 1.5; transition: opacity .12s; }
+  .node.sel circle { stroke: var(--text); stroke-width: 2.5; }
+  .node.mute { opacity: .12; }
+  .node text {
+    font-size: 9px; fill: var(--text); pointer-events: none;
+    paint-order: stroke; stroke: var(--bg); stroke-width: 2.5px;
+  }
+  .node.small text { display: none; }
+  .node.sel text, .node.near text { display: block; font-weight: 600; }
+  aside {
+    width: 330px; flex: 0 0 330px; border-left: 1px solid var(--line);
+    background: var(--panel); overflow-y: auto; padding: 12px 14px;
+  }
+  aside h2 { font-size: 14px; margin: 0 0 6px; line-height: 1.3; }
+  .tag {
+    display: inline-block; background: var(--chip); border-radius: 999px;
+    padding: 1px 8px; margin: 0 4px 4px 0; font-size: 11px; color: var(--muted);
+  }
+  .answer { white-space: pre-wrap; margin: 8px 0; }
+  .meta { color: var(--muted); font-size: 12px; margin: 6px 0; }
+  .sect { font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+          color: var(--muted); margin: 14px 0 6px; }
+  a { color: var(--accent); }
+  .nb { display: block; padding: 5px 7px; margin-bottom: 4px; border-radius: 6px;
+        background: var(--chip); cursor: pointer; }
+  .nb:hover { outline: 1px solid var(--accent); }
+  .nb .why { color: var(--muted); font-size: 11px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 6px 12px;
+            border-top: 1px solid var(--line); font-size: 11px; color: var(--muted); }
+  .legend span i { display: inline-block; width: 8px; height: 8px;
+                   border-radius: 50%; margin-right: 4px; }
+  @media (max-width: 720px) {
+    main { flex-direction: column; }
+    aside { width: auto; flex: 0 0 40%; border-left: 0; border-top: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Flashcard Knowledge Graph</h1>
+    <span class="stats" id="stats"></span>
+    <input id="q" type="search" placeholder="Search cards…" style="width:150px" />
+    <select id="cluster"></select>
+    <button id="reset">Reset view</button>
+  </header>
+  <main>
+    <div id="graphwrap"><svg id="graph"></svg></div>
+    <aside id="panel"></aside>
+  </main>
+  <div class="legend" id="legend"></div>
+</div>
+<script id="graph-data" type="application/json">{"generatedAt":"2026-08-05T11:15:21-04:00","source":"Notion Concepts database","width":1100,"height":860,"nodeCount":48,"edgeCount":145,"clusters":[{"name":"Academic writing","count":6},{"name":"Model Training","count":5},{"name":"Sports","count":4},{"name":"Vocabulary","count":4},{"name":"Artificial Intelligence","count":3},{"name":"Geography","count":3},{"name":"Philosophy","count":3},{"name":"Biology","count":2},{"name":"Cancer Biology","count":2},{"name":"Critical thinking","count":2},{"name":"Writing","count":2},{"name":"Zen","count":2},{"name":"AI Safety","count":1},{"name":"Academia","count":1},{"name":"Communication","count":1},{"name":"Ecology","count":1},{"name":"History","count":1},{"name":"Motivation","count":1},{"name":"Reasoning","count":1},{"name":"Rhetoric","count":1},{"name":"Seminar","count":1},{"name":"Seminar speech","count":1}],"nodes":[{"id":"3b3793c2264d81638a87fbf350c942fe","url":"https://app.notion.com/p/If-a-speaker-avoids-giving-a-direct-answer-without-making-an-obvious-lie-which-verb-may-be-more-pre-3b3793c2264d81638a87fbf350c942fe","title":"If a speaker avoids giving a direct answer without making an obvious lie, which verb may be more precise than “lie” or “evade”?","short":"If a speaker avoids giving a direct answer without making …","content":"","tags":["Vocabulary","Communication"],"cluster":"Communication","status":"Not started","due":"2026-08-05","link":null,"retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":297.2,"y":629.1,"degree":12},{"id":"3b3793c2264d815bb770e968aac1ce2e","url":"https://app.notion.com/p/What-kind-of-criticism-is-trenchant-and-how-does-it-differ-from-simply-harsh-3b3793c2264d815bb770e968aac1ce2e","title":"What kind of criticism is “trenchant,” and how does it differ from simply “harsh”?","short":"What kind of criticism is “trenchant,” and how does it dif…","content":"","tags":["Vocabulary","Seminar"],"cluster":"Seminar","status":"Not started","due":"2026-08-05","link":null,"retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":369.8,"y":129.6,"degree":12},{"id":"3b3793c2264d81bbb05ffea22b623785","url":"https://app.notion.com/p/When-is-invidious-more-precise-than-merely-unfair-or-offensive-in-VID-ee-us-3b3793c2264d81bbb05ffea22b623785","title":"When is “invidious” more precise than merely “unfair” or “offensive”? (in-VID-ee-us)","short":"When is “invidious” more precise than merely “unfair” or “…","content":"","tags":["Vocabulary","Writing"],"cluster":"Writing","status":"Not started","due":"2026-08-05","link":null,"retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":647.6,"y":742.6,"degree":11},{"id":"3b2793c2264d815e90c2d6ba667700dd","url":"https://app.notion.com/p/When-is-rebarbative-a-better-choice-than-difficult-or-unpleasant-for-describing-academic-prose-3b2793c2264d815e90c2d6ba667700dd","title":"When is “rebarbative” a better choice than “difficult” or “unpleasant” for describing academic prose?","short":"When is “rebarbative” a better choice than “difficult” or …","content":"","tags":["Vocabulary","Writing"],"cluster":"Writing","status":"Not started","due":"2026-08-04","link":null,"retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":618.7,"y":644.1,"degree":8},{"id":"3b2793c2264d813493cbf5fafbaf26c1","url":"https://app.notion.com/p/What-precise-kind-of-difficulty-does-aporia-name-in-a-seminar-discussion-or-philosophical-text-3b2793c2264d813493cbf5fafbaf26c1","title":"What precise kind of difficulty does “aporia” name in a seminar discussion or philosophical text?","short":"What precise kind of difficulty does “aporia” name in a se…","content":"","tags":["Vocabulary","Philosophy"],"cluster":"Philosophy","status":"Today's Cards","due":"2026-08-05","link":null,"retrievability":1.0,"reviewCount":2,"difficulty":"TODO","x":818.8,"y":400.1,"degree":9},{"id":"3b2793c2264d81c8a173d5895fb4831d","url":"https://app.notion.com/p/In-scholarly-writing-when-would-you-call-an-argument-or-narrative-proleptic-pr-LEP-tik-rather--3b2793c2264d81c8a173d5895fb4831d","title":"In scholarly writing, when would you call an argument or narrative “proleptic” (prə-LEP-tik) rather than merely predictive?","short":"In scholarly writing, when would you call an argument or n…","content":"","tags":["Vocabulary","Rhetoric"],"cluster":"Rhetoric","status":"Not started","due":"2026-08-04","link":null,"retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":300.4,"y":193.7,"degree":12},{"id":"3b0793c2264d819489f7eaec3d4326f8","url":"https://app.notion.com/p/In-scholarly-writing-when-would-proleptic-be-more-exact-than-merely-saying-anticipatory-3b0793c2264d819489f7eaec3d4326f8","title":"In scholarly writing, when would proleptic be more exact than merely saying anticipatory?","short":"In scholarly writing, when would proleptic be more exact t…","content":"","tags":["Vocabulary","Academic writing"],"cluster":"Academic writing","status":"Not started","due":"2026-08-02","link":null,"retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":602.0,"y":87.6,"degree":14},{"id":"3b0793c2264d81ec8d4aeaf8ba5a91ac","url":"https://app.notion.com/p/What-word-describes-a-comparison-or-distinction-that-unfairly-places-people-or-groups-in-a-worse-pos-3b0793c2264d81ec8d4aeaf8ba5a91ac","title":"What word describes a comparison or distinction that unfairly places people or groups in a worse position?","short":"What word describes a comparison or distinction that unfai…","content":"","tags":["Vocabulary","Critical thinking"],"cluster":"Critical thinking","status":"Today's Cards","due":"2026-08-05","link":null,"retrievability":1.0,"reviewCount":2,"difficulty":"TODO","x":731.7,"y":692.7,"degree":10},{"id":"3b0793c2264d81ddb4aff666fd0c2f11","url":"https://app.notion.com/p/When-is-tendentious-more-precise-than-merely-biased-or-opinionated-3b0793c2264d81ddb4aff666fd0c2f11","title":"When is tendentious more precise than merely biased or opinionated?","short":"When is tendentious more precise than merely biased or opi…","content":"","tags":["Vocabulary","Academic writing"],"cluster":"Academic writing","status":"Not started","due":"2026-08-02","link":null,"retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":601.2,"y":147.1,"degree":12},{"id":"3af793c2264d81969351f4562374e9c1","url":"https://app.notion.com/p/When-is-procrustean-more-exact-than-rigid-or-simplistic-3af793c2264d81969351f4562374e9c1","title":"When is “procrustean” more exact than “rigid” or “simplistic”?","short":"When is “procrustean” more exact than “rigid” or “simplist…","content":"","tags":["Vocabulary","Critical thinking"],"cluster":"Critical thinking","status":"Today's Cards","due":"2026-08-05","link":null,"retrievability":1.0,"reviewCount":2,"difficulty":"TODO","x":682.1,"y":615.5,"degree":6},{"id":"3af793c2264d81bd8459d2aa47a1c24f","url":"https://app.notion.com/p/What-is-an-aporia-and-how-might-you-use-the-word-in-a-seminar-discussion-3af793c2264d81bd8459d2aa47a1c24f","title":"What is an “aporia,” and how might you use the word in a seminar discussion?","short":"What is an “aporia,” and how might you use the word in a s…","content":"","tags":["Vocabulary","Philosophy"],"cluster":"Philosophy","status":"Not started","due":"2026-08-01","link":null,"retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":804.7,"y":495.8,"degree":15},{"id":"3af793c2264d8138b997c0dd530515fe","url":"https://app.notion.com/p/When-would-you-call-an-argument-or-account-tendentious-rather-than-merely-biased-or-partisan-3af793c2264d8138b997c0dd530515fe","title":"When would you call an argument or account “tendentious,” rather than merely biased or partisan?","short":"When would you call an argument or account “tendentious,” …","content":"","tags":["Vocabulary","Academic writing"],"cluster":"Academic writing","status":"Not started","due":"2026-08-01","link":null,"retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":493.8,"y":150.0,"degree":12},{"id":"3ae793c2264d8132ac1ac476e9b33cef","url":"https://app.notion.com/p/In-a-paper-what-does-it-mean-to-call-a-problem-aporetic-3ae793c2264d8132ac1ac476e9b33cef","title":"In a paper, what does it mean to call a problem “aporetic”?","short":"In a paper, what does it mean to call a problem “aporetic”…","content":"","tags":["Vocabulary","Philosophy"],"cluster":"Philosophy","status":"Today's Cards","due":"2026-08-05","link":null,"retrievability":1.0,"reviewCount":2,"difficulty":"TODO","x":889.2,"y":458.8,"degree":6},{"id":"3ae793c2264d81d4b27ff2670833925b","url":"https://app.notion.com/p/What-kind-of-criticism-is-trenchant-and-how-does-it-differ-from-merely-harsh-criticism-3ae793c2264d81d4b27ff2670833925b","title":"What kind of criticism is “trenchant,” and how does it differ from merely harsh criticism?","short":"What kind of criticism is “trenchant,” and how does it dif…","content":"","tags":["Vocabulary","Seminar speech"],"cluster":"Seminar speech","status":"Not started","due":"2026-07-31","link":null,"retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":456.5,"y":91.4,"degree":4},{"id":"3ae793c2264d81a1866ac85ce9e83248","url":"https://app.notion.com/p/When-is-tendentious-more-precise-than-simply-biased-3ae793c2264d81a1866ac85ce9e83248","title":"When is “tendentious” more precise than simply “biased”?","short":"When is “tendentious” more precise than simply “biased”?","content":"","tags":["Vocabulary","Academic writing"],"cluster":"Academic writing","status":"Today's Cards","due":"2026-08-05","link":null,"retrievability":1.0,"reviewCount":2,"difficulty":"TODO","x":550.0,"y":181.7,"degree":15},{"id":"3ad793c2264d81bd974cf04e785a68e0","url":"https://app.notion.com/p/Why-might-a-scholar-call-a-definition-stipulative-instead-of-saying-it-is-simply-correct-3ad793c2264d81bd974cf04e785a68e0","title":"Why might a scholar call a definition “stipulative” instead of saying it is simply “correct”?","short":"Why might a scholar call a definition “stipulative” instea…","content":"","tags":["Vocabulary","Academic writing"],"cluster":"Academic writing","status":"Not started","due":"2026-07-30","link":null,"retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":489.8,"y":82.9,"degree":11},{"id":"3ad793c2264d816ab176e5a9d552bc05","url":"https://app.notion.com/p/What-nuance-does-ineluctable-add-when-describing-a-consequence-or-conclusion-rather-than-merely-c-3ad793c2264d816ab176e5a9d552bc05","title":"What nuance does “ineluctable” add when describing a consequence or conclusion, rather than merely calling it “inevitable”?","short":"What nuance does “ineluctable” add when describing a conse…","content":"","tags":["Vocabulary","Reasoning"],"cluster":"Reasoning","status":"Not started","due":"2026-07-30","link":null,"retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":245.2,"y":270.8,"degree":12},{"id":"3ad793c2264d8193a77dfcbabedc0b50","url":"https://app.notion.com/p/In-a-paper-when-would-you-choose-adumbrate-AD-um-brayt-over-the-simpler-outline-3ad793c2264d8193a77dfcbabedc0b50","title":"In a paper, when would you choose “adumbrate” (AD-um-brayt) over the simpler “outline”?","short":"In a paper, when would you choose “adumbrate” (AD-um-brayt…","content":"","tags":["Vocabulary","Academic writing"],"cluster":"Academic writing","status":"Not started","due":"2026-07-30","link":null,"retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":550.0,"y":48.4,"degree":12},{"id":"3ac793c2264d8128a14ccb7b39fd8d41","url":"https://app.notion.com/p/What-does-invidious-in-VID-ee-us-mean-3ac793c2264d8128a14ccb7b39fd8d41","title":"What does invidious (in-VID-ee-us) mean?","short":"What does invidious (in-VID-ee-us) mean?","content":"","tags":["Vocabulary"],"cluster":"Vocabulary","status":"Not started","due":"2026-07-29","link":null,"retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":809.9,"y":184.8,"degree":9},{"id":"3ac793c2264d818f833eca6882f4eddd","url":"https://app.notion.com/p/What-does-rebarbative-ree-BAR-buh-tiv-mean-3ac793c2264d818f833eca6882f4eddd","title":"What does rebarbative (ree-BAR-buh-tiv) mean?","short":"What does rebarbative (ree-BAR-buh-tiv) mean?","content":"","tags":["Vocabulary"],"cluster":"Vocabulary","status":"Not started","due":"2026-07-29","link":null,"retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":804.8,"y":257.6,"degree":4},{"id":"3ac793c2264d81b8ad57e86c5ec748e5","url":"https://app.notion.com/p/What-does-heterodox-HET-er-uh-doks-mean-3ac793c2264d81b8ad57e86c5ec748e5","title":"What does heterodox (HET-er-uh-doks) mean?","short":"What does heterodox (HET-er-uh-doks) mean?","content":"","tags":["Vocabulary","Academia"],"cluster":"Academia","status":"Not started","due":"2026-07-29","link":null,"retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":370.8,"y":688.9,"degree":3},{"id":"3ac793c2264d81f5a280fdef66052304","url":"https://app.notion.com/p/What-chemical-reaction-do-protein-kinases-typically-catalyze-3ac793c2264d81f5a280fdef66052304","title":"What chemical reaction do protein kinases typically catalyze?","short":"What chemical reaction do protein kinases typically cataly…","content":"","tags":["Biology","Enzymes","Phosphorylation"],"cluster":"Biology","status":"Not started","due":"2026-07-29","link":"https://en.wikipedia.org/wiki/Protein_kinase","retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":777.4,"y":513.9,"degree":1},{"id":"3ac793c2264d81c08b87e101149f717a","url":"https://app.notion.com/p/How-can-protein-structures-and-kinase-recognition-motifs-be-combined-to-predict-phosphorylation-pote-3ac793c2264d81c08b87e101149f717a","title":"How can protein structures and kinase recognition motifs be combined to predict phosphorylation potential?","short":"How can protein structures and kinase recognition motifs b…","content":"","tags":["Biology","Proteins","Phosphorylation"],"cluster":"Biology","status":"Not started","due":"2026-07-29","link":"https://www.nature.com/articles/s41587-026-03239-5","retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":864.5,"y":553.7,"degree":1},{"id":"3ac793c2264d818d89e2e90741cae931","url":"https://app.notion.com/p/Why-is-combining-a-glioblastoma-organoid-with-a-brain-slice-useful-for-modeling-tumor-behavior-3ac793c2264d818d89e2e90741cae931","title":"Why is combining a glioblastoma organoid with a brain slice useful for modeling tumor behavior?","short":"Why is combining a glioblastoma organoid with a brain slic…","content":"","tags":["Cancer Biology","Neuroscience","Organoids"],"cluster":"Cancer Biology","status":"Not started","due":"2026-08-09","link":"https://www.nature.com/articles/s41596-026-01412-3","retrievability":1.0,"reviewCount":2,"difficulty":"TODO","x":740.8,"y":575.3,"degree":1},{"id":"3ac793c2264d81efb0f5fc95517ec81a","url":"https://app.notion.com/p/What-does-the-Core2Edge-model-allow-researchers-to-study-in-human-glioblastoma-3ac793c2264d81efb0f5fc95517ec81a","title":"What does the Core2Edge model allow researchers to study in human glioblastoma?","short":"What does the Core2Edge model allow researchers to study i…","content":"","tags":["Cancer Biology","Neuroscience","Organoids"],"cluster":"Cancer Biology","status":"Not started","due":"2026-07-29","link":"https://www.nature.com/articles/s41596-026-01412-3","retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":808.6,"y":634.0,"degree":1},{"id":"3ac793c2264d81d0ae67fb840aea12f3","url":"https://app.notion.com/p/Why-can-accountability-from-a-trusted-partner-improve-adherence-to-a-long-term-goal-3ac793c2264d81d0ae67fb840aea12f3","title":"Why can accountability from a trusted partner improve adherence to a long-term goal?","short":"Why can accountability from a trusted partner improve adhe…","content":"","tags":["Motivation","Behavior Change"],"cluster":"Motivation","status":"Not started","due":"2026-07-29","link":null,"retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":211.7,"y":361.4,"degree":0},{"id":"3ac793c2264d816a9725eb0a9e25c8b4","url":"https://app.notion.com/p/What-is-the-difference-between-pugnacious-and-pacific-3ac793c2264d816a9725eb0a9e25c8b4","title":"What is the difference between pugnacious and pacific?","short":"What is the difference between pugnacious and pacific?","content":"","tags":["Vocabulary"],"cluster":"Vocabulary","status":"Not started","due":"2026-08-09","link":"https://www.merriam-webster.com/dictionary/pugnacious","retrievability":1.0,"reviewCount":2,"difficulty":"TODO","x":728.4,"y":255.4,"degree":8},{"id":"3ac793c2264d80619fa6f171bdd22b66","url":"https://app.notion.com/p/Where-are-LoRA-adapters-inserted-relative-to-a-transformer-weight-matrix-W-3ac793c2264d80619fa6f171bdd22b66","title":"Where are LoRA adapters inserted relative to a transformer weight matrix W?","short":"Where are LoRA adapters inserted relative to a transformer…","content":"","tags":["Model Training"],"cluster":"Model Training","status":"Not started","due":"2026-07-28","link":null,"retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":589.4,"y":100.0,"degree":4},{"id":"3ac793c2264d8072a021e748d62d6aba","url":"https://app.notion.com/p/In-LoRA-how-is-the-update-W-parameterized-rank-factors-3ac793c2264d8072a021e748d62d6aba","title":"In LoRA, how is the update ΔW parameterized (rank / factors)?","short":"In LoRA, how is the update ΔW parameterized (rank / factor…","content":"","tags":["Model Training"],"cluster":"Model Training","status":"Today's Cards","due":"2026-08-05","link":null,"retrievability":1.0,"reviewCount":2,"difficulty":"TODO","x":696.1,"y":127.6,"degree":4},{"id":"3ac793c2264d800daf88e0461a27bba8","url":"https://app.notion.com/p/How-does-LoRA-differ-from-full-fine-tuning-of-all-weights-3ac793c2264d800daf88e0461a27bba8","title":"How does LoRA differ from full fine-tuning of all weights?","short":"How does LoRA differ from full fine-tuning of all weights?","content":"","tags":["Model Training"],"cluster":"Model Training","status":"Not started","due":"2026-07-28","link":null,"retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":647.0,"y":79.8,"degree":4},{"id":"3ac793c2264d80dbb3ecf73876214565","url":"https://app.notion.com/p/What-does-the-LoRA-rank-r-control-3ac793c2264d80dbb3ecf73876214565","title":"What does the LoRA rank r control?","short":"What does the LoRA rank r control?","content":"","tags":["Model Training"],"cluster":"Model Training","status":"Not started","due":"2026-08-09","link":null,"retrievability":1.0,"reviewCount":2,"difficulty":"TODO","x":583.3,"y":167.3,"degree":4},{"id":"3ac793c2264d81b0a5acfab540a3d5d1","url":"https://app.notion.com/p/When-did-the-United-States-last-try-year-round-daylight-saving-time-and-what-happened-3ac793c2264d81b0a5acfab540a3d5d1","title":"When did the United States last try year-round daylight saving time, and what happened?","short":"When did the United States last try year-round daylight sa…","content":"","tags":["History","Time Zones"],"cluster":"History","status":"Today's Cards","due":"2026-08-05","link":"https://www.transportation.gov/briefing-room/daylight-saving-time","retrievability":1.0,"reviewCount":1,"difficulty":"TODO","x":226.3,"y":456.5,"degree":1},{"id":"3ac793c2264d81f18482cdb06c4723cc","url":"https://app.notion.com/p/What-is-one-operational-practice-that-can-make-an-AI-deployment-more-reliable-3ac793c2264d81f18482cdb06c4723cc","title":"What is one operational practice that can make an AI deployment more reliable?","short":"What is one operational practice that can make an AI deplo…","content":"","tags":["Artificial Intelligence","MLOps"],"cluster":"Artificial Intelligence","status":"Today's Cards","due":"2026-08-05","link":"https://www.nist.gov/itl/ai-risk-management-framework","retrievability":1.0,"reviewCount":1,"difficulty":"TODO","x":772.5,"y":257.6,"degree":2},{"id":"3ac793c2264d810c9432dd0396397d13","url":"https://app.notion.com/p/According-to-the-note-where-might-the-next-AI-moat-arise-and-what-must-organizations-develop-to-be-3ac793c2264d810c9432dd0396397d13","title":"According to the note, where might the next AI moat arise, and what must organizations develop to benefit from foundation models?","short":"According to the note, where might the next AI moat arise,…","content":"","tags":["Artificial Intelligence","Deployment"],"cluster":"Artificial Intelligence","status":"Today's Cards","due":"2026-08-05","link":null,"retrievability":1.0,"reviewCount":1,"difficulty":"TODO","x":861.8,"y":267.6,"degree":3},{"id":"3ac793c2264d813fb87cd546bf3df298","url":"https://app.notion.com/p/What-convergence-between-single-LLMs-and-multi-agent-systems-does-the-Nature-article-discuss-3ac793c2264d813fb87cd546bf3df298","title":"What convergence between single LLMs and multi-agent systems does the Nature article discuss?","short":"What convergence between single LLMs and multi-agent syste…","content":"","tags":["Artificial Intelligence","Multi-Agent Systems"],"cluster":"Artificial Intelligence","status":"Not started","due":"2026-08-09","link":"https://www.nature.com/articles/s42256-026-01268-y","retrievability":1.0,"reviewCount":2,"difficulty":"TODO","x":811.0,"y":340.2,"degree":2},{"id":"3ac793c2264d8106ae27c6cef5a6ca80","url":"https://app.notion.com/p/Why-does-Anthropic-s-CEO-argue-that-banning-open-weight-AI-models-could-harm-safety-3ac793c2264d8106ae27c6cef5a6ca80","title":"Why does Anthropic's CEO argue that banning open-weight AI models could harm safety?","short":"Why does Anthropic's CEO argue that banning open-weight AI…","content":"","tags":["AI Safety","Open Models"],"cluster":"AI Safety","status":"Not started","due":"2026-08-09","link":"https://www.anthropic.com/news/position-open-weights-models","retrievability":1.0,"reviewCount":2,"difficulty":"TODO","x":455.9,"y":730.4,"degree":1},{"id":"3ac793c2264d813c80a9f3cc7f5c434c","url":"https://app.notion.com/p/Which-Boston-Red-Sox-player-is-nicknamed-Big-Papi-3ac793c2264d813c80a9f3cc7f5c434c","title":"Which Boston Red Sox player is nicknamed “Big Papi”?","short":"Which Boston Red Sox player is nicknamed “Big Papi”?","content":"","tags":["Sports","Baseball"],"cluster":"Sports","status":"Not started","due":"2026-08-09","link":"https://en.wikipedia.org/wiki/David_Ortiz","retrievability":1.0,"reviewCount":2,"difficulty":"TODO","x":749.1,"y":190.4,"degree":3},{"id":"3ac793c2264d814b82aad1577e3593c4","url":"https://app.notion.com/p/Who-are-some-of-the-most-famous-Boston-Red-Sox-players-3ac793c2264d814b82aad1577e3593c4","title":"Who are some of the most famous Boston Red Sox players?","short":"Who are some of the most famous Boston Red Sox players?","content":"","tags":["Sports","Baseball"],"cluster":"Sports","status":"Today's Cards","due":"2026-07-29","link":"https://en.wikipedia.org/wiki/Boston_Red_Sox","retrievability":1.0,"reviewCount":0,"difficulty":"TODO","x":679.5,"y":208.6,"degree":3},{"id":"3ac793c2264d81be8e63e2d8b0b3f0fc","url":"https://app.notion.com/p/What-is-the-Green-Monster-at-Fenway-Park-3ac793c2264d81be8e63e2d8b0b3f0fc","title":"What is the Green Monster at Fenway Park?","short":"What is the Green Monster at Fenway Park?","content":"","tags":["Sports","Baseball"],"cluster":"Sports","status":"Today's Cards","due":"2026-08-05","link":"https://www.mlb.com/redsox/ballpark/green-monster","retrievability":1.0,"reviewCount":1,"difficulty":"TODO","x":736.7,"y":119.5,"degree":3},{"id":"3ac793c2264d81e8b569ed44706e5b57","url":"https://app.notion.com/p/Why-is-Fenway-Park-called-Fenway-and-what-were-its-first-games-3ac793c2264d81e8b569ed44706e5b57","title":"Why is Fenway Park called Fenway, and what were its first games?","short":"Why is Fenway Park called Fenway, and what were its first …","content":"","tags":["Sports","Boston","History"],"cluster":"Sports","status":"Today's Cards","due":"2026-08-05","link":"https://www.mlb.com/redsox/ballpark","retrievability":1.0,"reviewCount":1,"difficulty":"TODO","x":662.6,"y":134.8,"degree":5},{"id":"3ac793c2264d8161b3fad05fc540b397","url":"https://app.notion.com/p/What-is-the-difference-between-garrulous-and-loquacious-3ac793c2264d8161b3fad05fc540b397","title":"What is the difference between “garrulous” and “loquacious”?","short":"What is the difference between “garrulous” and “loquacious…","content":"","tags":["Vocabulary"],"cluster":"Vocabulary","status":"Not started","due":"2026-08-07","link":"https://www.dictionary.com/browse/loquacious","retrievability":1.0,"reviewCount":2,"difficulty":"TODO","x":738.2,"y":180.7,"degree":12},{"id":"3ac793c2264d8154ac59f8b47403fed1","url":"https://app.notion.com/p/How-can-someone-practice-shoshin-while-learning-a-familiar-skill-3ac793c2264d8154ac59f8b47403fed1","title":"How can someone practice shoshin while learning a familiar skill?","short":"How can someone practice shoshin while learning a familiar…","content":"","tags":["Zen","Learning"],"cluster":"Zen","status":"Not started","due":"2026-08-09","link":"https://en.wikipedia.org/wiki/Shoshin","retrievability":1.0,"reviewCount":2,"difficulty":"TODO","x":550.0,"y":754.8,"degree":1},{"id":"3ac793c2264d81b79e34fe2dbfa317b0","url":"https://app.notion.com/p/What-does-the-Japanese-Zen-term-shoshin-mean-3ac793c2264d81b79e34fe2dbfa317b0","title":"What does the Japanese Zen term shoshin mean?","short":"What does the Japanese Zen term shoshin mean?","content":"","tags":["Zen","Mindfulness"],"cluster":"Zen","status":"Not started","due":"2026-08-09","link":"https://en.wikipedia.org/wiki/Shoshin","retrievability":1.0,"reviewCount":2,"difficulty":"TODO","x":550.0,"y":660.2,"degree":1},{"id":"3ac793c2264d81f9b0d5e814a4854a87","url":"https://app.notion.com/p/How-does-a-swamp-differ-from-a-marsh-3ac793c2264d81f9b0d5e814a4854a87","title":"How does a swamp differ from a marsh?","short":"How does a swamp differ from a marsh?","content":"","tags":["Geography","Ecology"],"cluster":"Geography","status":"Not started","due":"2026-08-09","link":"https://www.britannica.com/science/marsh","retrievability":1.0,"reviewCount":2,"difficulty":"TODO","x":817.1,"y":424.2,"degree":3},{"id":"3ac793c2264d81d0ab13e405a2ea17dc","url":"https://app.notion.com/p/Why-are-bogs-often-acidic-and-low-in-nutrients-3ac793c2264d81d0ab13e405a2ea17dc","title":"Why are bogs often acidic and low in nutrients?","short":"Why are bogs often acidic and low in nutrients?","content":"","tags":["Ecology","Soil"],"cluster":"Ecology","status":"Not started","due":"2026-08-09","link":"https://en.wikipedia.org/wiki/Bog","retrievability":1.0,"reviewCount":2,"difficulty":"TODO","x":253.0,"y":545.7,"degree":3},{"id":"3ac793c2264d8198aa92c611d06cf1c3","url":"https://app.notion.com/p/How-does-a-fen-differ-from-a-bog-3ac793c2264d8198aa92c611d06cf1c3","title":"How does a fen differ from a bog?","short":"How does a fen differ from a bog?","content":"","tags":["Geography","Ecology"],"cluster":"Geography","status":"Today's Cards","due":"2026-08-05","link":"https://en.wikipedia.org/wiki/Peatland","retrievability":1.0,"reviewCount":1,"difficulty":"TODO","x":887.0,"y":361.5,"degree":3},{"id":"3ac793c2264d817f8a86ce645a0d46ab","url":"https://app.notion.com/p/What-is-a-fen-and-what-primarily-supplies-its-water-3ac793c2264d817f8a86ce645a0d46ab","title":"What is a fen, and what primarily supplies its water?","short":"What is a fen, and what primarily supplies its water?","content":"","tags":["Geography","Ecology"],"cluster":"Geography","status":"Today's Cards","due":"2026-08-05","link":"https://en.wikipedia.org/wiki/Fen","retrievability":1.0,"reviewCount":1,"difficulty":"TODO","x":808.1,"y":328.6,"degree":3},{"id":"35d793c2264d8073a0f3eedfadeed8a0","url":"https://app.notion.com/p/What-does-LoRA-freeze-vs-update-during-fine-tuning-35d793c2264d8073a0f3eedfadeed8a0","title":"What does LoRA freeze vs update during fine-tuning?","short":"What does LoRA freeze vs update during fine-tuning?","content":"","tags":["Model Training"],"cluster":"Model Training","status":"Not started","due":"2026-08-09","link":null,"retrievability":1.0,"reviewCount":2,"difficulty":"TODO","x":651.5,"y":183.0,"degree":4}],"edges":[{"source":"3b3793c2264d81638a87fbf350c942fe","target":"3b3793c2264d815bb770e968aac1ce2e","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d81638a87fbf350c942fe","target":"3b3793c2264d81bbb05ffea22b623785","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d81638a87fbf350c942fe","target":"3b2793c2264d813493cbf5fafbaf26c1","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d81638a87fbf350c942fe","target":"3b0793c2264d81ec8d4aeaf8ba5a91ac","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d81638a87fbf350c942fe","target":"3b0793c2264d81ddb4aff666fd0c2f11","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d81638a87fbf350c942fe","target":"3af793c2264d81969351f4562374e9c1","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d81638a87fbf350c942fe","target":"3af793c2264d81bd8459d2aa47a1c24f","weight":4.2,"reasons":["tag:vocabulary","3 shared terms"]},{"source":"3b3793c2264d81638a87fbf350c942fe","target":"3ae793c2264d8132ac1ac476e9b33cef","weight":3.2,"reasons":["tag:vocabulary","2 shared terms"]},{"source":"3b3793c2264d81638a87fbf350c942fe","target":"3ae793c2264d81a1866ac85ce9e83248","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d81638a87fbf350c942fe","target":"3ad793c2264d816ab176e5a9d552bc05","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d81638a87fbf350c942fe","target":"3ad793c2264d8193a77dfcbabedc0b50","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d81638a87fbf350c942fe","target":"3ac793c2264d8128a14ccb7b39fd8d41","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d815bb770e968aac1ce2e","target":"3b2793c2264d813493cbf5fafbaf26c1","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d815bb770e968aac1ce2e","target":"3b2793c2264d81c8a173d5895fb4831d","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d815bb770e968aac1ce2e","target":"3b0793c2264d81ec8d4aeaf8ba5a91ac","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d815bb770e968aac1ce2e","target":"3af793c2264d81bd8459d2aa47a1c24f","weight":3.2,"reasons":["tag:vocabulary","2 shared terms"]},{"source":"3b3793c2264d815bb770e968aac1ce2e","target":"3af793c2264d8138b997c0dd530515fe","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d815bb770e968aac1ce2e","target":"3ae793c2264d81d4b27ff2670833925b","weight":8.2,"reasons":["tag:vocabulary","3 shared terms"]},{"source":"3b3793c2264d815bb770e968aac1ce2e","target":"3ae793c2264d81a1866ac85ce9e83248","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d815bb770e968aac1ce2e","target":"3ad793c2264d81bd974cf04e785a68e0","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d815bb770e968aac1ce2e","target":"3ad793c2264d816ab176e5a9d552bc05","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d815bb770e968aac1ce2e","target":"3ac793c2264d818f833eca6882f4eddd","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d815bb770e968aac1ce2e","target":"3ac793c2264d8161b3fad05fc540b397","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d81bbb05ffea22b623785","target":"3b2793c2264d815e90c2d6ba667700dd","weight":4.2,"reasons":["tag:vocabulary","tag:writing"]},{"source":"3b3793c2264d81bbb05ffea22b623785","target":"3b2793c2264d813493cbf5fafbaf26c1","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d81bbb05ffea22b623785","target":"3b0793c2264d81ec8d4aeaf8ba5a91ac","weight":7.2,"reasons":["tag:vocabulary","3 shared terms"]},{"source":"3b3793c2264d81bbb05ffea22b623785","target":"3b0793c2264d81ddb4aff666fd0c2f11","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d81bbb05ffea22b623785","target":"3af793c2264d81bd8459d2aa47a1c24f","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d81bbb05ffea22b623785","target":"3af793c2264d8138b997c0dd530515fe","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d81bbb05ffea22b623785","target":"3ae793c2264d81a1866ac85ce9e83248","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d81bbb05ffea22b623785","target":"3ac793c2264d8128a14ccb7b39fd8d41","weight":7.2,"reasons":["tag:vocabulary","3 shared terms"]},{"source":"3b3793c2264d81bbb05ffea22b623785","target":"3ac793c2264d816a9725eb0a9e25c8b4","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b3793c2264d81bbb05ffea22b623785","target":"3ac793c2264d8161b3fad05fc540b397","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b2793c2264d815e90c2d6ba667700dd","target":"3b0793c2264d819489f7eaec3d4326f8","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b2793c2264d815e90c2d6ba667700dd","target":"3af793c2264d81bd8459d2aa47a1c24f","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b2793c2264d815e90c2d6ba667700dd","target":"3af793c2264d8138b997c0dd530515fe","weight":3.2,"reasons":["tag:vocabulary","2 shared terms"]},{"source":"3b2793c2264d815e90c2d6ba667700dd","target":"3ad793c2264d816ab176e5a9d552bc05","weight":3.2,"reasons":["tag:vocabulary","2 shared terms"]},{"source":"3b2793c2264d815e90c2d6ba667700dd","target":"3ac793c2264d8128a14ccb7b39fd8d41","weight":3.2,"reasons":["tag:vocabulary","2 shared terms"]},{"source":"3b2793c2264d815e90c2d6ba667700dd","target":"3ac793c2264d818f833eca6882f4eddd","weight":7.2,"reasons":["tag:vocabulary","3 shared terms"]},{"source":"3b2793c2264d815e90c2d6ba667700dd","target":"3ac793c2264d81b8ad57e86c5ec748e5","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b2793c2264d813493cbf5fafbaf26c1","target":"3b0793c2264d81ddb4aff666fd0c2f11","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b2793c2264d813493cbf5fafbaf26c1","target":"3af793c2264d81bd8459d2aa47a1c24f","weight":12.2,"reasons":["tag:vocabulary","tag:philosophy","2 shared terms"]},{"source":"3b2793c2264d813493cbf5fafbaf26c1","target":"3ae793c2264d8132ac1ac476e9b33cef","weight":9.2,"reasons":["tag:vocabulary","tag:philosophy","2 shared terms"]},{"source":"3b2793c2264d813493cbf5fafbaf26c1","target":"3ae793c2264d81a1866ac85ce9e83248","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b2793c2264d813493cbf5fafbaf26c1","target":"3ad793c2264d81bd974cf04e785a68e0","weight":3.2,"reasons":["tag:vocabulary","2 shared terms"]},{"source":"3b2793c2264d813493cbf5fafbaf26c1","target":"3ad793c2264d816ab176e5a9d552bc05","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b2793c2264d81c8a173d5895fb4831d","target":"3b0793c2264d819489f7eaec3d4326f8","weight":9.2,"reasons":["tag:vocabulary","3 shared terms"]},{"source":"3b2793c2264d81c8a173d5895fb4831d","target":"3b0793c2264d81ec8d4aeaf8ba5a91ac","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b2793c2264d81c8a173d5895fb4831d","target":"3af793c2264d81969351f4562374e9c1","weight":3.2,"reasons":["tag:vocabulary","2 shared terms"]},{"source":"3b2793c2264d81c8a173d5895fb4831d","target":"3af793c2264d8138b997c0dd530515fe","weight":4.2,"reasons":["tag:vocabulary","3 shared terms"]},{"source":"3b2793c2264d81c8a173d5895fb4831d","target":"3ae793c2264d8132ac1ac476e9b33cef","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b2793c2264d81c8a173d5895fb4831d","target":"3ae793c2264d81a1866ac85ce9e83248","weight":3.2,"reasons":["tag:vocabulary","2 shared terms"]},{"source":"3b2793c2264d81c8a173d5895fb4831d","target":"3ad793c2264d816ab176e5a9d552bc05","weight":3.2,"reasons":["tag:vocabulary","2 shared terms"]},{"source":"3b2793c2264d81c8a173d5895fb4831d","target":"3ad793c2264d8193a77dfcbabedc0b50","weight":4.2,"reasons":["tag:vocabulary","3 shared terms"]},{"source":"3b2793c2264d81c8a173d5895fb4831d","target":"3ac793c2264d8128a14ccb7b39fd8d41","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b2793c2264d81c8a173d5895fb4831d","target":"3ac793c2264d816a9725eb0a9e25c8b4","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b2793c2264d81c8a173d5895fb4831d","target":"3ac793c2264d8161b3fad05fc540b397","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b0793c2264d819489f7eaec3d4326f8","target":"3b0793c2264d81ddb4aff666fd0c2f11","weight":4.2,"reasons":["tag:vocabulary","tag:academic writing"]},{"source":"3b0793c2264d819489f7eaec3d4326f8","target":"3af793c2264d81969351f4562374e9c1","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b0793c2264d819489f7eaec3d4326f8","target":"3af793c2264d81bd8459d2aa47a1c24f","weight":3.2,"reasons":["tag:vocabulary","2 shared terms"]},{"source":"3b0793c2264d819489f7eaec3d4326f8","target":"3af793c2264d8138b997c0dd530515fe","weight":5.2,"reasons":["tag:vocabulary","tag:academic writing","1 shared term"]},{"source":"3b0793c2264d819489f7eaec3d4326f8","target":"3ae793c2264d81d4b27ff2670833925b","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b0793c2264d819489f7eaec3d4326f8","target":"3ae793c2264d81a1866ac85ce9e83248","weight":5.2,"reasons":["tag:vocabulary","tag:academic writing","1 shared term"]},{"source":"3b0793c2264d819489f7eaec3d4326f8","target":"3ad793c2264d81bd974cf04e785a68e0","weight":6.2,"reasons":["tag:vocabulary","tag:academic writing","2 shared terms"]},{"source":"3b0793c2264d819489f7eaec3d4326f8","target":"3ad793c2264d8193a77dfcbabedc0b50","weight":7.2,"reasons":["tag:vocabulary","tag:academic writing","2 shared terms"]},{"source":"3b0793c2264d819489f7eaec3d4326f8","target":"3ac793c2264d8128a14ccb7b39fd8d41","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b0793c2264d819489f7eaec3d4326f8","target":"3ac793c2264d816a9725eb0a9e25c8b4","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b0793c2264d819489f7eaec3d4326f8","target":"3ac793c2264d8161b3fad05fc540b397","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b0793c2264d81ec8d4aeaf8ba5a91ac","target":"3af793c2264d81969351f4562374e9c1","weight":8.2,"reasons":["tag:vocabulary","tag:critical thinking","2 shared terms"]},{"source":"3b0793c2264d81ec8d4aeaf8ba5a91ac","target":"3af793c2264d81bd8459d2aa47a1c24f","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b0793c2264d81ec8d4aeaf8ba5a91ac","target":"3ae793c2264d81a1866ac85ce9e83248","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b0793c2264d81ec8d4aeaf8ba5a91ac","target":"3ad793c2264d81bd974cf04e785a68e0","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b0793c2264d81ec8d4aeaf8ba5a91ac","target":"3ac793c2264d8128a14ccb7b39fd8d41","weight":11.2,"reasons":["tag:vocabulary","3 shared terms"]},{"source":"3b0793c2264d81ec8d4aeaf8ba5a91ac","target":"3ac793c2264d8161b3fad05fc540b397","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b0793c2264d81ddb4aff666fd0c2f11","target":"3af793c2264d81bd8459d2aa47a1c24f","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b0793c2264d81ddb4aff666fd0c2f11","target":"3af793c2264d8138b997c0dd530515fe","weight":9.2,"reasons":["tag:vocabulary","tag:academic writing","2 shared terms"]},{"source":"3b0793c2264d81ddb4aff666fd0c2f11","target":"3ae793c2264d8132ac1ac476e9b33cef","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3b0793c2264d81ddb4aff666fd0c2f11","target":"3ae793c2264d81a1866ac85ce9e83248","weight":10.2,"reasons":["tag:vocabulary","tag:academic writing","2 shared terms"]},{"source":"3b0793c2264d81ddb4aff666fd0c2f11","target":"3ad793c2264d81bd974cf04e785a68e0","weight":4.2,"reasons":["tag:vocabulary","tag:academic writing"]},{"source":"3b0793c2264d81ddb4aff666fd0c2f11","target":"3ad793c2264d816ab176e5a9d552bc05","weight":3.2,"reasons":["tag:vocabulary","2 shared terms"]},{"source":"3b0793c2264d81ddb4aff666fd0c2f11","target":"3ad793c2264d8193a77dfcbabedc0b50","weight":5.2,"reasons":["tag:vocabulary","tag:academic writing","1 shared term"]},{"source":"3b0793c2264d81ddb4aff666fd0c2f11","target":"3ac793c2264d8161b3fad05fc540b397","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3af793c2264d81969351f4562374e9c1","target":"3ae793c2264d81d4b27ff2670833925b","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3af793c2264d81969351f4562374e9c1","target":"3ad793c2264d81bd974cf04e785a68e0","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3af793c2264d81bd8459d2aa47a1c24f","target":"3ae793c2264d8132ac1ac476e9b33cef","weight":12.2,"reasons":["tag:vocabulary","tag:philosophy","2 shared terms"]},{"source":"3af793c2264d81bd8459d2aa47a1c24f","target":"3ae793c2264d81a1866ac85ce9e83248","weight":4.2,"reasons":["tag:vocabulary","3 shared terms"]},{"source":"3af793c2264d81bd8459d2aa47a1c24f","target":"3ad793c2264d81bd974cf04e785a68e0","weight":4.2,"reasons":["tag:vocabulary","3 shared terms"]},{"source":"3af793c2264d81bd8459d2aa47a1c24f","target":"3ad793c2264d816ab176e5a9d552bc05","weight":3.2,"reasons":["tag:vocabulary","2 shared terms"]},{"source":"3af793c2264d81bd8459d2aa47a1c24f","target":"3ad793c2264d8193a77dfcbabedc0b50","weight":3.2,"reasons":["tag:vocabulary","2 shared terms"]},{"source":"3af793c2264d81bd8459d2aa47a1c24f","target":"3ac793c2264d81b8ad57e86c5ec748e5","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3af793c2264d81bd8459d2aa47a1c24f","target":"3ac793c2264d8161b3fad05fc540b397","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3af793c2264d8138b997c0dd530515fe","target":"3ae793c2264d81a1866ac85ce9e83248","weight":11.2,"reasons":["tag:vocabulary","tag:academic writing","2 shared terms"]},{"source":"3af793c2264d8138b997c0dd530515fe","target":"3ad793c2264d81bd974cf04e785a68e0","weight":4.2,"reasons":["tag:vocabulary","tag:academic writing"]},{"source":"3af793c2264d8138b997c0dd530515fe","target":"3ad793c2264d816ab176e5a9d552bc05","weight":3.2,"reasons":["tag:vocabulary","2 shared terms"]},{"source":"3af793c2264d8138b997c0dd530515fe","target":"3ad793c2264d8193a77dfcbabedc0b50","weight":5.2,"reasons":["tag:vocabulary","tag:academic writing","1 shared term"]},{"source":"3af793c2264d8138b997c0dd530515fe","target":"3ac793c2264d81b8ad57e86c5ec748e5","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3af793c2264d8138b997c0dd530515fe","target":"3ac793c2264d816a9725eb0a9e25c8b4","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3ae793c2264d8132ac1ac476e9b33cef","target":"3ad793c2264d816ab176e5a9d552bc05","weight":3.2,"reasons":["tag:vocabulary","2 shared terms"]},{"source":"3ae793c2264d81d4b27ff2670833925b","target":"3ac793c2264d818f833eca6882f4eddd","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3ae793c2264d81a1866ac85ce9e83248","target":"3ad793c2264d81bd974cf04e785a68e0","weight":5.2,"reasons":["tag:vocabulary","tag:academic writing","1 shared term"]},{"source":"3ae793c2264d81a1866ac85ce9e83248","target":"3ad793c2264d816ab176e5a9d552bc05","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3ae793c2264d81a1866ac85ce9e83248","target":"3ad793c2264d8193a77dfcbabedc0b50","weight":6.2,"reasons":["tag:vocabulary","tag:academic writing","2 shared terms"]},{"source":"3ae793c2264d81a1866ac85ce9e83248","target":"3ac793c2264d816a9725eb0a9e25c8b4","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3ae793c2264d81a1866ac85ce9e83248","target":"3ac793c2264d8161b3fad05fc540b397","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3ad793c2264d81bd974cf04e785a68e0","target":"3ad793c2264d8193a77dfcbabedc0b50","weight":4.2,"reasons":["tag:vocabulary","tag:academic writing"]},{"source":"3ad793c2264d81bd974cf04e785a68e0","target":"3ac793c2264d8161b3fad05fc540b397","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3ad793c2264d816ab176e5a9d552bc05","target":"3ad793c2264d8193a77dfcbabedc0b50","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3ad793c2264d816ab176e5a9d552bc05","target":"3ac793c2264d8161b3fad05fc540b397","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3ad793c2264d8193a77dfcbabedc0b50","target":"3ac793c2264d8128a14ccb7b39fd8d41","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3ad793c2264d8193a77dfcbabedc0b50","target":"3ac793c2264d816a9725eb0a9e25c8b4","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3ad793c2264d8193a77dfcbabedc0b50","target":"3ac793c2264d8161b3fad05fc540b397","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3ac793c2264d8128a14ccb7b39fd8d41","target":"3ac793c2264d818f833eca6882f4eddd","weight":3.2,"reasons":["tag:vocabulary","2 shared terms"]},{"source":"3ac793c2264d8128a14ccb7b39fd8d41","target":"3ac793c2264d816a9725eb0a9e25c8b4","weight":2.2,"reasons":["tag:vocabulary","1 shared term"]},{"source":"3ac793c2264d816a9725eb0a9e25c8b4","target":"3ac793c2264d8161b3fad05fc540b397","weight":3.2,"reasons":["tag:vocabulary","2 shared terms"]},{"source":"3ac793c2264d81f5a280fdef66052304","target":"3ac793c2264d81c08b87e101149f717a","weight":8.0,"reasons":["tag:biology","tag:phosphorylation","2 shared terms"]},{"source":"3ac793c2264d818d89e2e90741cae931","target":"3ac793c2264d81efb0f5fc95517ec81a","weight":17.0,"reasons":["tag:cancer biology","tag:neuroscience","tag:organoids","1 shared term"]},{"source":"3ac793c2264d80619fa6f171bdd22b66","target":"3ac793c2264d8072a021e748d62d6aba","weight":7.0,"reasons":["tag:model training","3 shared terms"]},{"source":"3ac793c2264d80619fa6f171bdd22b66","target":"3ac793c2264d800daf88e0461a27bba8","weight":5.0,"reasons":["tag:model training","2 shared terms"]},{"source":"3ac793c2264d80619fa6f171bdd22b66","target":"3ac793c2264d80dbb3ecf73876214565","weight":4.0,"reasons":["tag:model training","1 shared term"]},{"source":"3ac793c2264d80619fa6f171bdd22b66","target":"35d793c2264d8073a0f3eedfadeed8a0","weight":5.0,"reasons":["tag:model training","2 shared terms"]},{"source":"3ac793c2264d8072a021e748d62d6aba","target":"3ac793c2264d800daf88e0461a27bba8","weight":3.0,"reasons":["tag:model training"]},{"source":"3ac793c2264d8072a021e748d62d6aba","target":"3ac793c2264d80dbb3ecf73876214565","weight":3.0,"reasons":["tag:model training"]},{"source":"3ac793c2264d8072a021e748d62d6aba","target":"35d793c2264d8073a0f3eedfadeed8a0","weight":5.0,"reasons":["tag:model training","2 shared terms"]},{"source":"3ac793c2264d800daf88e0461a27bba8","target":"3ac793c2264d80dbb3ecf73876214565","weight":5.0,"reasons":["tag:model training","2 shared terms"]},{"source":"3ac793c2264d800daf88e0461a27bba8","target":"35d793c2264d8073a0f3eedfadeed8a0","weight":6.0,"reasons":["tag:model training","3 shared terms"]},{"source":"3ac793c2264d80dbb3ecf73876214565","target":"35d793c2264d8073a0f3eedfadeed8a0","weight":5.0,"reasons":["tag:model training","2 shared terms"]},{"source":"3ac793c2264d81b0a5acfab540a3d5d1","target":"3ac793c2264d81e8b569ed44706e5b57","weight":3.0,"reasons":["tag:history"]},{"source":"3ac793c2264d81f18482cdb06c4723cc","target":"3ac793c2264d810c9432dd0396397d13","weight":7.0,"reasons":["tag:artificial intelligence","3 shared terms"]},{"source":"3ac793c2264d81f18482cdb06c4723cc","target":"3ac793c2264d813fb87cd546bf3df298","weight":4.0,"reasons":["tag:artificial intelligence","1 shared term"]},{"source":"3ac793c2264d810c9432dd0396397d13","target":"3ac793c2264d813fb87cd546bf3df298","weight":5.0,"reasons":["tag:artificial intelligence","2 shared terms"]},{"source":"3ac793c2264d813c80a9f3cc7f5c434c","target":"3ac793c2264d814b82aad1577e3593c4","weight":10.0,"reasons":["tag:sports","tag:baseball","2 shared terms"]},{"source":"3ac793c2264d813c80a9f3cc7f5c434c","target":"3ac793c2264d81be8e63e2d8b0b3f0fc","weight":6.0,"reasons":["tag:sports","tag:baseball"]},{"source":"3ac793c2264d813c80a9f3cc7f5c434c","target":"3ac793c2264d81e8b569ed44706e5b57","weight":4.0,"reasons":["tag:sports","1 shared term"]},{"source":"3ac793c2264d814b82aad1577e3593c4","target":"3ac793c2264d81be8e63e2d8b0b3f0fc","weight":7.0,"reasons":["tag:sports","tag:baseball","1 shared term"]},{"source":"3ac793c2264d814b82aad1577e3593c4","target":"3ac793c2264d81e8b569ed44706e5b57","weight":4.0,"reasons":["tag:sports","1 shared term"]},{"source":"3ac793c2264d81be8e63e2d8b0b3f0fc","target":"3ac793c2264d81e8b569ed44706e5b57","weight":4.0,"reasons":["tag:sports","1 shared term"]},{"source":"3ac793c2264d8154ac59f8b47403fed1","target":"3ac793c2264d81b79e34fe2dbfa317b0","weight":4.0,"reasons":["tag:zen","1 shared term"]},{"source":"3ac793c2264d81f9b0d5e814a4854a87","target":"3ac793c2264d8198aa92c611d06cf1c3","weight":8.0,"reasons":["tag:geography","tag:ecology","2 shared terms"]},{"source":"3ac793c2264d81f9b0d5e814a4854a87","target":"3ac793c2264d817f8a86ce645a0d46ab","weight":10.0,"reasons":["tag:geography","tag:ecology","2 shared terms"]},{"source":"3ac793c2264d8198aa92c611d06cf1c3","target":"3ac793c2264d817f8a86ce645a0d46ab","weight":7.0,"reasons":["tag:geography","tag:ecology","1 shared term"]},{"source":"3ac793c2264d81f9b0d5e814a4854a87","target":"3ac793c2264d81d0ab13e405a2ea17dc","weight":3.0,"reasons":["tag:ecology"]},{"source":"3ac793c2264d81d0ab13e405a2ea17dc","target":"3ac793c2264d8198aa92c611d06cf1c3","weight":6.0,"reasons":["tag:ecology","3 shared terms"]},{"source":"3ac793c2264d81d0ab13e405a2ea17dc","target":"3ac793c2264d817f8a86ce645a0d46ab","weight":5.0,"reasons":["tag:ecology","2 shared terms"]},{"source":"3b0793c2264d819489f7eaec3d4326f8","target":"3ac793c2264d81e8b569ed44706e5b57","weight":2.0,"reasons":["2 shared terms"]},{"source":"3ac793c2264d810c9432dd0396397d13","target":"3ac793c2264d8106ae27c6cef5a6ca80","weight":2.0,"reasons":["2 shared terms"]}],"public":true}</script>
+<script>
+(function () {
+  var DATA = JSON.parse(document.getElementById('graph-data').textContent);
+  var nodes = DATA.nodes, edges = DATA.edges;
+  var byId = {}; nodes.forEach(function (n) { byId[n.id] = n; });
+
+  var clusters = DATA.clusters.map(function (c) { return c.name; });
+  var colorOf = {};
+  clusters.forEach(function (c, i) {
+    colorOf[c] = 'hsl(' + Math.round((i * 137.508) % 360) + ' 65% 58%)';
+  });
+
+  var nbr = {};
+  nodes.forEach(function (n) { nbr[n.id] = []; });
+  edges.forEach(function (e) {
+    if (!nbr[e.source] || !nbr[e.target]) return;
+    nbr[e.source].push({ id: e.target, w: e.weight, reasons: e.reasons });
+    nbr[e.target].push({ id: e.source, w: e.weight, reasons: e.reasons });
+  });
+  Object.keys(nbr).forEach(function (k) {
+    nbr[k].sort(function (a, b) { return b.w - a.w; });
+  });
+
+  var svg = document.getElementById('graph');
+  var NS = 'http://www.w3.org/2000/svg';
+  var view = { x: 0, y: 0, w: DATA.width, h: DATA.height };
+  svg.setAttribute('viewBox', [view.x, view.y, view.w, view.h].join(' '));
+
+  var gEdges = document.createElementNS(NS, 'g');
+  var gNodes = document.createElementNS(NS, 'g');
+  svg.appendChild(gEdges); svg.appendChild(gNodes);
+
+  var edgeEls = edges.map(function (e) {
+    var a = byId[e.source], b = byId[e.target];
+    var ln = document.createElementNS(NS, 'line');
+    ln.setAttribute('x1', a.x); ln.setAttribute('y1', a.y);
+    ln.setAttribute('x2', b.x); ln.setAttribute('y2', b.y);
+    ln.setAttribute('stroke-width', Math.min(3, 0.5 + e.weight / 4));
+    ln.setAttribute('class', 'edge');
+    gEdges.appendChild(ln);
+    return ln;
+  });
+
+  var nodeEls = nodes.map(function (n) {
+    var g = document.createElementNS(NS, 'g');
+    g.setAttribute('class', 'node' + (n.degree < 3 ? ' small' : ''));
+    g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+    var c = document.createElementNS(NS, 'circle');
+    c.setAttribute('r', Math.min(16, 5 + Math.sqrt(n.degree || 0) * 2.4));
+    c.setAttribute('fill', colorOf[n.cluster] || '#888');
+    g.appendChild(c);
+    var t = document.createElementNS(NS, 'text');
+    t.setAttribute('x', 0);
+    t.setAttribute('y', -Math.min(16, 5 + Math.sqrt(n.degree || 0) * 2.4) - 4);
+    t.setAttribute('text-anchor', 'middle');
+    t.textContent = n.title.length > 30 ? n.title.slice(0, 29) + '…' : n.title;
+    g.appendChild(t);
+    g.addEventListener('click', function (ev) { ev.stopPropagation(); select(n.id); });
+    gNodes.appendChild(g);
+    return g;
+  });
+
+  var selected = null;
+  var clusterFilter = '';
+  var query = '';
+
+  function matches(n) {
+    if (clusterFilter && n.cluster !== clusterFilter) return false;
+    if (query) {
+      var hay = (n.title + ' ' + (n.content || '') + ' ' +
+                 n.tags.join(' ')).toLowerCase();
+      if (hay.indexOf(query) < 0) return false;
+    }
+    return true;
+  }
+
+  function paint() {
+    var near = {};
+    if (selected) {
+      near[selected] = true;
+      nbr[selected].forEach(function (x) { near[x.id] = true; });
+    }
+    nodes.forEach(function (n, i) {
+      var el = nodeEls[i];
+      var ok = matches(n);
+      var dim = !ok || (selected && !near[n.id]);
+      el.classList.toggle('mute', !!dim);
+      el.classList.toggle('sel', n.id === selected);
+      el.classList.toggle('near', !!(selected && near[n.id]));
+    });
+    edges.forEach(function (e, i) {
+      var el = edgeEls[i];
+      var hot = selected && (e.source === selected || e.target === selected);
+      var visible = matches(byId[e.source]) && matches(byId[e.target]);
+      el.classList.toggle('hot', !!hot);
+      el.classList.toggle('mute', !visible || (selected && !hot));
+    });
+  }
+
+  function fmt(v, d) { return (v === null || v === undefined || v === '') ? d : v; }
+
+  function select(id) {
+    selected = id;
+    var n = byId[id];
+    var p = document.getElementById('panel');
+    if (!n) { p.innerHTML = emptyPanel(); paint(); return; }
+    var html = '<h2>' + esc(n.title) + '</h2>';
+    html += '<div>' + n.tags.map(function (t) {
+      return '<span class="tag">' + esc(t) + '</span>';
+    }).join('') + '</div>';
+    html += n.content
+      ? '<div class="answer">' + esc(n.content) + '</div>'
+      : '<div class="answer" style="color:var(--muted)">Answer hidden on the ' +
+        'public graph. Open the card in Notion to review it.</div>';
+    html += '<div class="meta">Status: ' + esc(fmt(n.status, '—')) +
+            ' · Due: ' + esc(fmt(n.due, '—')) +
+            ' · Reviews: ' + n.reviewCount +
+            (n.retrievability !== null && n.retrievability !== undefined
+              ? ' · Retrievability: ' + Math.round(n.retrievability * 100) + '%' : '') +
+            '</div>';
+    if (n.url) html += '<div class="meta"><a href="' + esc(n.url) +
+                       '" target="_blank" rel="noopener">Open card in Notion ↗</a></div>';
+    if (n.link) html += '<div class="meta"><a href="' + esc(n.link) +
+                        '" target="_blank" rel="noopener">Source ↗</a></div>';
+    var ns = nbr[id] || [];
+    html += '<div class="sect">Connected cards (' + ns.length + ')</div>';
+    ns.slice(0, 25).forEach(function (x) {
+      var m = byId[x.id];
+      if (!m) return;
+      html += '<div class="nb" data-id="' + m.id + '">' + esc(m.short) +
+              '<div class="why">' + esc(x.reasons.join(', ')) + '</div></div>';
+    });
+    if (!ns.length) html += '<div class="meta">No inferred connections yet.</div>';
+    p.innerHTML = html;
+    Array.prototype.forEach.call(p.querySelectorAll('.nb'), function (el) {
+      el.addEventListener('click', function () { select(el.getAttribute('data-id')); });
+    });
+    p.scrollTop = 0;
+    paint();
+  }
+
+  function emptyPanel() {
+    return '<div class="sect">Getting started</div>' +
+      '<div class="meta">Click any node to see the flashcard, its answer, and every ' +
+      'card it connects to. Connected nodes stay lit; everything else dims. ' +
+      'Scroll to zoom, drag to pan.</div>' +
+      '<div class="sect">Biggest hubs</div>' +
+      nodes.slice().sort(function (a, b) { return b.degree - a.degree; })
+        .slice(0, 8).map(function (n) {
+          return '<div class="nb" data-id="' + n.id + '">' + esc(n.short) +
+                 '<div class="why">' + n.degree + ' connections · ' +
+                 esc(n.cluster) + '</div></div>';
+        }).join('');
+  }
+
+  function esc(s) {
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  var sel = document.getElementById('cluster');
+  sel.innerHTML = '<option value="">All topics (' + nodes.length + ')</option>' +
+    DATA.clusters.map(function (c) {
+      return '<option value="' + esc(c.name) + '">' + esc(c.name) +
+             ' (' + c.count + ')</option>';
+    }).join('');
+  sel.addEventListener('change', function () { clusterFilter = sel.value; paint(); });
+
+  document.getElementById('q').addEventListener('input', function (e) {
+    query = e.target.value.trim().toLowerCase(); paint();
+  });
+
+  document.getElementById('stats').textContent =
+    DATA.nodeCount + ' cards · ' + DATA.edgeCount + ' connections · ' +
+    DATA.clusters.length + ' topics · updated ' + DATA.generatedAt.slice(0, 16).replace('T', ' ');
+
+  document.getElementById('legend').innerHTML = DATA.clusters.map(function (c) {
+    return '<span><i style="background:' + colorOf[c.name] + '"></i>' +
+           esc(c.name) + '</span>';
+  }).join('');
+
+  document.getElementById('reset').addEventListener('click', function () {
+    selected = null; clusterFilter = ''; query = '';
+    sel.value = ''; document.getElementById('q').value = '';
+    view = { x: 0, y: 0, w: DATA.width, h: DATA.height };
+    applyView();
+    document.getElementById('panel').innerHTML = emptyPanel();
+    bindEmpty();
+    paint();
+  });
+
+  function bindEmpty() {
+    var p = document.getElementById('panel');
+    Array.prototype.forEach.call(p.querySelectorAll('.nb'), function (el) {
+      el.addEventListener('click', function () { select(el.getAttribute('data-id')); });
+    });
+  }
+
+  function applyView() {
+    svg.setAttribute('viewBox', [view.x, view.y, view.w, view.h].join(' '));
+  }
+
+  svg.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var k = e.deltaY > 0 ? 1.12 : 0.89;
+    var r = svg.getBoundingClientRect();
+    var mx = view.x + ((e.clientX - r.left) / r.width) * view.w;
+    var my = view.y + ((e.clientY - r.top) / r.height) * view.h;
+    var nw = Math.max(180, Math.min(DATA.width * 3, view.w * k));
+    var nh = nw * (view.h / view.w);
+    view.x = mx - (mx - view.x) * (nw / view.w);
+    view.y = my - (my - view.y) * (nh / view.h);
+    view.w = nw; view.h = nh;
+    applyView();
+  }, { passive: false });
+
+  var drag = null;
+  svg.addEventListener('pointerdown', function (e) {
+    drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
+    svg.classList.add('dragging');
+    svg.setPointerCapture(e.pointerId);
+  });
+  svg.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    var r = svg.getBoundingClientRect();
+    view.x = drag.vx - (e.clientX - drag.x) * (view.w / r.width);
+    view.y = drag.vy - (e.clientY - drag.y) * (view.h / r.height);
+    applyView();
+  });
+  ['pointerup', 'pointercancel'].forEach(function (evt) {
+    svg.addEventListener(evt, function () { drag = null; svg.classList.remove('dragging'); });
+  });
+  svg.addEventListener('click', function () { select(null); });
+
+  document.getElementById('panel').innerHTML = emptyPanel();
+  bindEmpty();
+  paint();
+})();
+</script>
+</body>
+</html>
